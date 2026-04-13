@@ -17,17 +17,38 @@ Replace this paragraph with your own summary of what your version does.
 
 ## How The System Works
 
-Explain your design in plain language.
+Each song is described by six features: genre and mood (categorical) and energy, acousticness, valence, and danceability (numeric, each on a 0–1 scale). A user profile stores one preferred value for each of those same features. To score a song, the recommender compares the song's numeric features to the user's preferences using 1 - |user_preference - song_value|, so closer matches score higher. Genre and mood use an exact-match rule that returns 1 if they match and 0 if they don't. The six feature scores are combined into a single weighted average, with genre (0.30) and mood (0.25) weighted most heavily since a mismatch there overrides any numeric similarity. Once every song in the catalog has a score, the list is sorted descending and the top results are returned. Scoring and ranking are kept as separate steps: scoring measures how well one song fits the user in isolation, while ranking determines the final order across the full catalog and handles tie-breaking.
 
-Some prompts to answer:
+```mermaid
+flowchart TD
+    subgraph IN["INPUT"]
+        A["User Preferences\ngenre · mood · energy\nacousticness · valence · danceability"]
+        B["songs.csv — 18 songs"]
+    end
 
-- What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-- What information does your `UserProfile` store
-- How does your `Recommender` compute a score for each song
-- How do you choose which songs to recommend
+    subgraph LOOP["PROCESS — score every song"]
+        C["Score genre & mood\nexact match → 1 or 0"]
+        D["Score numeric features\n1 − |user pref − song value|"]
+        E["Weighted sum\ngenre 30% · mood 25% · energy 18%\nacousticness 12% · valence 10% · dance 5%"]
+        F{More songs?}
+    end
 
-You can include a simple diagram or bullet list if helpful.
+    subgraph OUT["OUTPUT"]
+        G["Sort all scores descending\ntie-break: genre → mood → energy"]
+        H["Top k songs\nsong · score · explanation"]
+    end
+
+    A --> C
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F -- Yes --> C
+    F -- No --> G
+    G --> H
+```
+
+For each song in the catalog, the system computes a weighted score between 0.0 and 1.0. Genre and mood use an exact-match rule — each returns 1 if it matches the user's preference and 0 if it doesn't. The four numeric features (energy, acousticness, valence, danceability) each use 1 - |user_preference - song_value|, so a closer match scores higher. Those six feature scores are combined as a weighted average: genre (0.30), mood (0.25), energy (0.18), acousticness (0.12), valence (0.10), danceability (0.05). Genre and mood together carry 55% of the total weight, meaning a song that mismatches both can score at most 0.45 regardless of its numeric fit. Once every song is scored, the list is sorted descending; ties are broken by genre match first, then mood match, then energy score. The top k songs are returned. Using the indie pop / happy profile as an example, Rooftop Lights scores 0.99, Sunrise City scores 0.66 (mood matches but genre doesn't), and Storm Runner scores 0.35 (both categorical features miss). Potential biases to be aware of: the high weight on genre and mood means niche or cross-genre songs are systematically penalized even when their acoustic texture is a near-perfect match; acousticness is down-weighted partly because it correlates with energy, but this can cause the system to overlook songs that are high-energy and acoustic (e.g. folk-rock); and the profile's fixed target values assume a single consistent taste, so a user who likes both quiet jazz and intense EDM depending on context will get mediocre recommendations across the board.
 
 ---
 
